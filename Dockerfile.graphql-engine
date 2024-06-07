@@ -1,0 +1,7 @@
+FROM hasura/graphql-engine:${HASURA_GRAPHQL_VERSION:-v2.38.1}.cli-migrations-v3
+
+# Copy migrations and metadata
+COPY ./backend/hasura/migrations /hasura-migrations
+COPY ./backend/hasura/metadata /hasura-metadata
+
+EXPOSE 8080
