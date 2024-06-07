@@ -30,6 +30,13 @@ services:
       HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
       HASURA_GRAPHQL_ADMIN_SECRET: $HASURA_GRAPHQL_ADMIN_SECRET
       HASURA_GRAPHQL_ENABLE_TELEMETRY: "false"
+    labels:
+      - "autoheal=true"
+      - "traefik.http.routers.graphql-engine.priority=10"
+      - "traefik.http.routers.graphql-engine.rule=PathPrefix(`/v1`)"
+      - "traefik.http.routers.graphql-engine.service=graphql-engine-service"
+      - "traefik.http.routers.graphql-engine.entrypoints=web"
+      - "traefik.http.services.graphql-engine-service.loadbalancer.server.port=8080"
 
   hasura-cli:
     build:
