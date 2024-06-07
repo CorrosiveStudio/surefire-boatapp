@@ -9,7 +9,7 @@ services:
     restart: always
 
   hasura-postgres:
-    image: postgres:${HASURA_POSTGRES_VERSION:-16}
+    image: postgres:${HASURA_POSTGRES_VERSION:-latest}
     restart: always
     environment:
       POSTGRES_PASSWORD: $HASURA_POSTGRES_PASSWORD
@@ -31,7 +31,6 @@ services:
       HASURA_GRAPHQL_ADMIN_SECRET: $HASURA_GRAPHQL_ADMIN_SECRET
       HASURA_GRAPHQL_ENABLE_TELEMETRY: "false"
     labels:
-      - "autoheal=true"
       - "traefik.http.routers.graphql-engine.priority=10"
       - "traefik.http.routers.graphql-engine.rule=PathPrefix(`/v1`)"
       - "traefik.http.routers.graphql-engine.service=graphql-engine-service"
@@ -43,7 +42,7 @@ services:
       context: ./backend
       args:
         VERSION: ${HASURA_VERSION}
-    restart: on-failure
+    restart: always
     network_mode: host
     entrypoint: hasura console --admin-secret $HASURA_GRAPHQL_ADMIN_SECRET --address 0.0.0.0 --console-hge-endpoint http://localhost:8080 --no-browser
     volumes:
@@ -54,7 +53,7 @@ services:
       HASURA_GRAPHQL_ENABLE_TELEMETRY: "false"
 
   traefik:
-    image: traefik:v2.8
+    image: traefik:${TRAEFIK_VERSION:-latest}
     command:
       - "--api.insecure=true"
       - "--providers.docker=true"
@@ -68,6 +67,7 @@ services:
 
   ngrok:
     image: ngrok/ngrok:alpine
+    restart: always
     environment:
       NGROK_AUTHTOKEN: ${NGROK_TOKEN}
       NGROK_TUNNEL_ADDR: "80"
@@ -77,3 +77,47 @@ services:
       - traefik
     ports:
       - "4040:4040"
+
+  fief-worker:
+    image: ghcr.io/fief-dev/fief:${FIEF_VERSION:-latest}
+    restart: always
+    command: fief run-worker -p 1 -t 1
+    env_file:
+      - .env-feif
+    depends_on:
+      - fief-postgres
+      - fief-redis
+
+  fief-postgres:
+    image: postgres:${FIEF_POSTGRES_VERSION:-latest}
+    restart: always
+    env_file:
+      - .env-feif
+    volumes:
+      - fief-postgres-data:/var/lib/postgresql/data
+
+  fief-redis:
+    image: redis:alpine
+    restart: always
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - fief-redis-data:/data
+
+  fief-server:
+    image: ghcr.io/fief-dev/fief:${FIEF_VERSION:-latest}
+    restart: always
+    command: fief run-server
+    env_file:
+      - .env-feif
+    depends_on:
+      - fief-postgres
+      - fief-redis
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.fief-server.rule=PathPrefix(`/`)"
+      - "traefik.http.services.fief-server.loadbalancer.server.port=8000"
+      - "traefik.http.routers.fief-server.priority=1"
+
+volumes:
+  fief-redis-data:
+  fief-postgres-data:
