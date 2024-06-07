@@ -7,21 +7,66 @@ services:
     environment:
       - AUTOHEAL_CONTAINER_LABEL=all
     restart: always
+
   hasura-postgres:
     image: postgres:${HASURA_POSTGRES_VERSION:-16}
     restart: always
     environment:
       POSTGRES_PASSWORD: $HASURA_POSTGRES_PASSWORD
       POSTGRES_USER: $HASURA_POSTGRES_USER
-  graphql-engine:
+
+  hasura:
     image: hasura/graphql-engine:${HASURA_VERSION:-v2.39.0}
+    restart: always
+    depends_on:
+      - hasura-postgres
     ports:
       - "8080:8080"
-    restart: always
     environment:
       HASURA_GRAPHQL_METADATA_DATABASE_URL: postgres://$HASURA_POSTGRES_USER:$HASURA_POSTGRES_PASSWORD@$HASURA_POSTGRES_HOST:5432/postgres
       PG_DATABASE_URL: postgres://$HASURA_POSTGRES_USER:$HASURA_POSTGRES_PASSWORD@$HASURA_POSTGRES_HOST:5432/postgres
-      HASURA_GRAPHQL_ENABLE_CONSOLE: "true" # set to "false" to disable console
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
       HASURA_GRAPHQL_DEV_MODE: "true"
       HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
       HASURA_GRAPHQL_ADMIN_SECRET: $HASURA_GRAPHQL_ADMIN_SECRET
+      HASURA_GRAPHQL_ENABLE_TELEMETRY: "false"
+
+  hasura-cli:
+    build:
+      context: ./backend
+      args:
+        VERSION: ${HASURA_VERSION}
+    restart: on-failure
+    network_mode: host
+    entrypoint: hasura console --admin-secret $HASURA_GRAPHQL_ADMIN_SECRET --address 0.0.0.0 --console-hge-endpoint http://localhost:8080 --no-browser
+    volumes:
+      - ./backend/hasura:/src/hasura
+    working_dir: /src/hasura
+    environment:
+      HASURA_GRAPHQL_ADMIN_SECRET: $HASURA_GRAPHQL_ADMIN_SECRET
+      HASURA_GRAPHQL_ENABLE_TELEMETRY: "false"
+
+  traefik:
+    image: traefik:v2.8
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8181:8080" # Dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: always
+
+  ngrok:
+    image: ngrok/ngrok:alpine
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_TOKEN}
+      NGROK_TUNNEL_ADDR: "80"
+      NGROK_PROTOCOL: "http"
+    command: ${NGROK_ARGS}
+    depends_on:
+      - traefik
+    ports:
+      - "4040:4040"
