@@ -116,10 +116,10 @@ services:
       - ./certs:/certs
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.fief-server.rule=PathPrefix(`/login`)"
+      - "traefik.http.routers.fief-server.rule=PathPrefix(`/`)"
       - "traefik.http.routers.fief-server.entrypoints=web"
       - "traefik.http.services.fief-server.loadbalancer.server.scheme=https"
-      - "traefik.http.services.fief-server.loadbalancer.server.port=443"
+      - "traefik.http.services.fief-server.loadbalancer.server.port=8000"
       - "traefik.http.middlewares.forward-https.headers.customRequestHeaders.X-Forwarded-Proto=https"
       - "traefik.http.routers.fief-server.middlewares=forward-https"
 
@@ -127,11 +127,11 @@ services:
     build:
       context: ./frontend
     restart: always
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.nuxt-frontend.rule=PathPrefix(`/`)"
-      - "traefik.http.services.nuxt-frontend.loadbalancer.server.port=8100"
-      - "traefik.http.routers.nuxt-frontend.priority=1"
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.http.routers.nuxt-frontend.rule=PathPrefix(`/`)"
+    #   - "traefik.http.services.nuxt-frontend.loadbalancer.server.port=8100"
+    #   - "traefik.http.routers.nuxt-frontend.priority=1"
 
 volumes:
   fief-redis-data:
